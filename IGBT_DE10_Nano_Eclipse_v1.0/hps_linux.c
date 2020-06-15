@@ -500,7 +500,7 @@ void rd_hall_sens_stat (uint8_t i2c_addr_relay) {
 
 }
 
-void rd_hall_sens_data (int board, uint8_t i2c_addr_relay) {
+void rd_hall_sens_data (int board, uint8_t i2c_addr_relay, double *XGauss, double *YGauss, double *ZGauss, double *Temp ) {
 	uint32_t REG28;
 	uint32_t REG29;
 	switch(board)
@@ -522,7 +522,7 @@ void rd_hall_sens_data (int board, uint8_t i2c_addr_relay) {
 		}
 
 	int16_t XDigit, YDigit, ZDigit, TempDigit;
-	double XGauss, YGauss, ZGauss, Temp;
+	//double XGauss, YGauss, ZGauss, Temp;
 	XDigit 		= (((REG28>>Vola28_X_Axis_MSBs_OFST) & Vola28_X_Axis_MSBs_BASEMASK)<<4) 			| ((REG29>>Vola29_X_Axis_LSBs_OFST) & Vola29_X_Axis_LSBs_BASEMASK); // combine MSB and LSB
 	YDigit 		= (((REG28>>Vola28_Y_Axis_MSBs_OFST) & Vola28_Y_Axis_MSBs_BASEMASK)<<4)		 		| ((REG29>>Vola29_Y_Axis_LSBs_OFST) & Vola29_Y_Axis_LSBs_BASEMASK); // combine MSB and LSB
 	ZDigit 		= (((REG28>>Vola28_Z_Axis_MSBs_OFST) & Vola28_Z_Axis_MSBs_BASEMASK)<<4) 			| ((REG29>>Vola29_Z_Axis_LSBs_OFST) & Vola29_Z_Axis_LSBs_BASEMASK); // combine MSB and LSB
@@ -538,18 +538,18 @@ void rd_hall_sens_data (int board, uint8_t i2c_addr_relay) {
 	// Force the digit to 1 now
 	TempDigit = TempDigit | Temperature_FIRSTBIT_MSK;
 
-	XGauss = ((double) XDigit/16) / 1; // divide by 1 and .25 is coming from datasheet. Divide by 16 is coming from shift by 4 factor above.
-	YGauss = ((double) YDigit/16) / 1;
-	ZGauss = ((double) ZDigit/16) / .25;
-	Temp = 273.15 + (((double) TempDigit/16) / 8); // divide by 8 is coming from datasheet. Divide by 16 is coming from shift by 4 factor above.
+	*XGauss = ((double) XDigit/16) / 1; // divide by 1 and .25 is coming from datasheet. Divide by 16 is coming from shift by 4 factor above.
+	*YGauss = ((double) YDigit/16) / 1;
+	*ZGauss = ((double) ZDigit/16) / .25;
+	*Temp = 273.15 + (((double) TempDigit/16) / 8); // divide by 8 is coming from datasheet. Divide by 16 is coming from shift by 4 factor above.
 
 	if(ENABLE_MESSAGE)
 	{
 		printf("sensor address %d \n ", i2c_addr_relay);
-		printf("X = %5.2f Gauss\n", XGauss);
-		printf("Y = %5.2f Gauss\n", YGauss);
-		printf("Z = %5.2f Gauss\n", ZGauss);
-		printf("Temp = %5.2f %%C\n", Temp);
+		printf("X = %5.2f Gauss\n", *XGauss);
+		printf("Y = %5.2f Gauss\n", *YGauss);
+		printf("Z = %5.2f Gauss\n", *ZGauss);
+		printf("Temp = %5.2f %%C\n", *Temp);
 		printf("\n");
 	}
 
@@ -561,23 +561,27 @@ void rd_hall_sens_data (int board, uint8_t i2c_addr_relay) {
 //	}
 //	else
 //		fprintf(fptr, "\t, %d \t , %5.2f \t , %5.2f \t , %5.2f \t , %5.2f \n",i2c_addr_relay,XGauss,YGauss,ZGauss,Temp);
-		fprintf(fptr, "%5.2f, %5.2f, %5.2f, %5.2f",XGauss,YGauss,ZGauss,Temp);
+		//fprintf(fptr, "%5.2f, %5.2f, %5.2f, %5.2f",XGauss,YGauss,ZGauss,Temp);
 }
 
 void write_Hall_reading_to_txt(int channel, uint32_t sensor_address){
 
-	sprintf(pathname,"%s", "HallReading.csv");
+	double XGauss, YGauss, ZGauss, Temp;
 
 	fptr = fopen(pathname, "a+");
+
 	fprintf(fptr, "Sensor: %d, %d,",channel, sensor_address);
 	//read all three boards sensor_address
-	rd_hall_sens_data(1,sensor_address);
+	rd_hall_sens_data(1, sensor_address, &XGauss, &YGauss, &ZGauss, &Temp);
+	fprintf(fptr, "%5.2f, %5.2f, %5.2f, %5.2f",XGauss,YGauss,ZGauss,Temp);
 	usleep(10000);
 	fprintf(fptr, ",");
-	rd_hall_sens_data(2,sensor_address);
+	rd_hall_sens_data(2, sensor_address, &XGauss, &YGauss, &ZGauss, &Temp);
+	fprintf(fptr, "%5.2f, %5.2f, %5.2f, %5.2f",XGauss,YGauss,ZGauss,Temp);
 	usleep(10000);
 	fprintf(fptr, ",");
-	rd_hall_sens_data(3,sensor_address);
+	//rd_hall_sens_data(3, sensor_address, &XGauss, &YGauss, &ZGauss, &Temp);
+	fprintf(fptr, "%5.2f, %5.2f, %5.2f, %5.2f",XGauss,YGauss,ZGauss,Temp);
 	usleep(10000);
 	fprintf(fptr, "\n");
 
@@ -701,7 +705,6 @@ void time_test_function(){
     UDP_TRANSMISSION_OFF();
 }
 
-
 int main(int argc, char * argv[]) {
 
 	int igbt_pulse_num = 4;
@@ -761,18 +764,28 @@ int main(int argc, char * argv[]) {
 //		printf("Hall Effect Sensor directly connects to FPGA\n");
 //	}
 
+	//Set time
+	time_t t = time(NULL);
+	struct tm *local = localtime(&t);
+    sprintf(pathname,"%04d_%02d_%02d_%02d_%02d_%02d_%s", local->tm_year + 1900, local->tm_mon + 1, local->tm_mday, local->tm_hour, local->tm_min, local->tm_sec,"HallArrayReading.csv");
 
-    int CH_Selected[8][6] = {
-    		{96, 97, 99, 0, 101, 109},
-			{96, 97, 99, 100, 108},
-			{96, 97, 99, 100, 108},
-			{96, 97, 99, 100, 107},
-			{96, 97, 99, 100, 108},
-			{96, 97, 99, 100, 108},
-	  		{96, 97, 99, 100, 108},
-    		{97, 99, 100, 101, 108}
-			};
     int k = 0;
+    int CH_Address_size[8]= {6, 5, 5, 5, 5, 5, 5, 6};
+ /*   for(k = 0; k < 8 ; k++)
+    {
+    	CH_Address[k] = malloc (sizeof(int) * CH_Address_size[k]);
+    }
+*/
+    int CH_Selected[8][6] = {
+    		{96, 97, 99, 0, 101, 109},	//sensor addr 0
+			{96, 97, 99, 100, 108},		//sensor addr 1
+			{96, 97, 99, 100, 108}, 	//sensor addr 2
+			{96, 97, 99, 0, 107}, 		//sensor addr 3
+			{96, 97, 99, 100, 108},		//sensor addr 4
+			{96, 97, 99, 100, 108},		//sensor addr 5
+			{96, 97, 99, 100, 108},		//sensor addr 6
+    		{96, 97, 99, 100, 101, 108}	//sensor addr 7
+			};
     int8_t channel_command = 0b00000001;
 
 	printf("Read channels 0 to 7\n");
@@ -783,136 +796,320 @@ int main(int argc, char * argv[]) {
     	// choose selected channel
     	channel_command = channel_command << i;
     	tca_channel_select(channel_command, ENABLE_MESSAGE); 	// tca_channel_select(uint8_t channel_addr, uint8_t en_mesg); channel_addr 0-7
+		printf("channel %d Start! \n", i);
 
-    	for(k = 0; k < sizeof(CH_Selected[i])/sizeof(int)-1; k++){
-    		printf("channel %d Start! \n", i);
+		for(k = 0; k < CH_Address_size[k]+1; k++){
+			printf("%d",k);
+			printf("sensor address %d\n",CH_Selected[i][k]);
     		write_Hall_reading_to_txt(i,CH_Selected[i][k]);
-
+    		usleep(100000);
     		//reset
     		tca_channel_select(HUB_channel_all_off, DISABLE_MESSAGE); 	// tca_channel_select(uint8_t channel_addr, uint8_t en_mesg); channel_addr 0-7
     		tca_channel_select(channel_command, DISABLE_MESSAGE); 	// tca_channel_select(uint8_t channel_addr, uint8_t en_mesg); channel_addr 0-7
     	}
     }
-
+/*
 
     for(i=0; i<10; i++)
-	    {
-	    	printf("Read channels 7 to 0\n");
+	{
+		printf("Read channels 7 to 0\n");
 
-	    	printf("channel 7 Start! \n");
-	    	tca_channel_select(HUB_channel_7_on, ENABLE_MESSAGE); 	// tca_channel_select(uint8_t channel_addr, uint8_t en_mesg); channel_addr 0-7
-	    	//write_Hall_reading_to_txt(7,96);
-	       	usleep(10000);
-			write_Hall_reading_to_txt(7,97);
-		   	usleep(10000);
-		   	tca_channel_select(HUB_channel_all_off, ENABLE_MESSAGE); 	// tca_channel_select(uint8_t channel_addr, uint8_t en_mesg); channel_addr 0-7
-		   	tca_channel_select(HUB_channel_7_on, ENABLE_MESSAGE); 	// tca_channel_select(uint8_t channel_addr, uint8_t en_mesg); channel_addr 0-7
+		printf("channel 7 Start! \n");
+		tca_channel_select(HUB_channel_7_on, ENABLE_MESSAGE); 	// tca_channel_select(uint8_t channel_addr, uint8_t en_mesg); channel_addr 0-7
+		write_Hall_reading_to_txt(7,96);
+		usleep(10000);
+		tca_channel_select(HUB_channel_all_off, DISABLE_MESSAGE); 	// tca_channel_select(uint8_t channel_addr, uint8_t en_mesg); channel_addr 0-7
+		usleep(10000);
+		tca_channel_select(HUB_channel_7_on, DISABLE_MESSAGE); 	// tca_channel_select(uint8_t channel_addr, uint8_t en_mesg); channel_addr 0-7
+		write_Hall_reading_to_txt(7,97);
+		usleep(10000);
+		tca_channel_select(HUB_channel_all_off, DISABLE_MESSAGE); 	// tca_channel_select(uint8_t channel_addr, uint8_t en_mesg); channel_addr 0-7
+		usleep(10000);
+		tca_channel_select(HUB_channel_7_on, DISABLE_MESSAGE); 	// tca_channel_select(uint8_t channel_addr, uint8_t en_mesg); channel_addr 0-7
 
-			write_Hall_reading_to_txt(7,99);
-		   	usleep(10000);
-			write_Hall_reading_to_txt(7,100);
-		   	usleep(10000);
-			write_Hall_reading_to_txt(7,101);
-		   	usleep(10000);
-			write_Hall_reading_to_txt(7,108);
-	    	printf("Read channel 7 Complete! \n");
+		write_Hall_reading_to_txt(7,99);
+		usleep(10000);
 
-	    	printf("channel 6 Start! \n");
-			tca_channel_select(HUB_channel_6_on, ENABLE_MESSAGE); 	// tca_channel_select(uint8_t channel_addr, uint8_t en_mesg); channel_addr 0-7
-			write_Hall_reading_to_txt(6,96);
-		   	usleep(10000);
-			write_Hall_reading_to_txt(6,97);
-		   	usleep(10000);
-			write_Hall_reading_to_txt(6,99);
-		   	usleep(10000);
-			write_Hall_reading_to_txt(6,100);
-		   	usleep(10000);
-			write_Hall_reading_to_txt(6,108);
-	    	printf("Read channel 6 Complete! \n");
+		tca_channel_select(HUB_channel_all_off, DISABLE_MESSAGE); 	// tca_channel_select(uint8_t channel_addr, uint8_t en_mesg); channel_addr 0-7
+		usleep(10000);
+		tca_channel_select(HUB_channel_7_on, DISABLE_MESSAGE); 	// tca_channel_select(uint8_t channel_addr, uint8_t en_mesg); channel_addr 0-7
 
-	    	printf("channel 5 Start! \n");
-	    	tca_channel_select(HUB_channel_5_on, ENABLE_MESSAGE); 	// tca_channel_select(uint8_t channel_addr, uint8_t en_mesg); channel_addr 0-7
-			write_Hall_reading_to_txt(5,96);
-		   	usleep(10000);
-			write_Hall_reading_to_txt(5,97);
-		   	usleep(10000);
-			write_Hall_reading_to_txt(5,99);
-			usleep(10000);
-			write_Hall_reading_to_txt(5,100);
-		   	usleep(10000);
-		   	write_Hall_reading_to_txt(5,108);
-	    	printf("Read channel 5 Complete! \n");
+		write_Hall_reading_to_txt(7,100);
+		usleep(10000);
 
-	    	printf("channel 4 Start! \n");
-	    	tca_channel_select(HUB_channel_4_on, ENABLE_MESSAGE); 	// tca_channel_select(uint8_t channel_addr, uint8_t en_mesg); channel_addr 0-7
-			write_Hall_reading_to_txt(4,96);
-		   	usleep(10000);
-		   	write_Hall_reading_to_txt(4,97);
-		   	usleep(10000);
-		   	write_Hall_reading_to_txt(4,99);
-		   	usleep(10000);
-		   	write_Hall_reading_to_txt(4,100);
-		   	usleep(10000);
-		   	write_Hall_reading_to_txt(4,108);
-	    	printf("Read channel 4 Complete! \n");
+		tca_channel_select(HUB_channel_all_off, DISABLE_MESSAGE); 	// tca_channel_select(uint8_t channel_addr, uint8_t en_mesg); channel_addr 0-7
+		usleep(10000);
+		tca_channel_select(HUB_channel_7_on, DISABLE_MESSAGE); 	// tca_channel_select(uint8_t channel_addr, uint8_t en_mesg); channel_addr 0-7
 
-	    	printf("channel 3 Start! \n");
-	    	tca_channel_select(HUB_channel_3_on, ENABLE_MESSAGE); 	// tca_channel_select(uint8_t channel_addr, uint8_t en_mesg); channel_addr 0-7
-			write_Hall_reading_to_txt(3,96);
-		   	usleep(10000);
-			write_Hall_reading_to_txt(3,97);
-		   	usleep(10000);
-			write_Hall_reading_to_txt(3,99);
-		   	usleep(10000);
-			write_Hall_reading_to_txt(3,100);
-		   	usleep(10000);
-			write_Hall_reading_to_txt(3,107);
-	    	printf("Read channel 3 Complete! \n");
+		write_Hall_reading_to_txt(7,101);
+		usleep(10000);
 
-	    	printf("channel 2 Start! \n");
-	    	tca_channel_select(HUB_channel_2_on, ENABLE_MESSAGE); 	// tca_channel_select(uint8_t channel_addr, uint8_t en_mesg); channel_addr 0-7
-			write_Hall_reading_to_txt(2,96);
-		   	usleep(10000);
-			write_Hall_reading_to_txt(2,97);
-		   	usleep(10000);
-			write_Hall_reading_to_txt(2,99);
-		   	usleep(10000);
-			write_Hall_reading_to_txt(2,100);
-		   	usleep(10000);
-			write_Hall_reading_to_txt(2,108);
-	    	printf("Read channel 2 Complete! \n");
+		tca_channel_select(HUB_channel_all_off, DISABLE_MESSAGE); 	// tca_channel_select(uint8_t channel_addr, uint8_t en_mesg); channel_addr 0-7
+		usleep(10000);
+		tca_channel_select(HUB_channel_7_on, DISABLE_MESSAGE); 	// tca_channel_select(uint8_t channel_addr, uint8_t en_mesg); channel_addr 0-7
 
-	    	printf("channel 1 Start! \n");
-	    	tca_channel_select(HUB_channel_1_on, ENABLE_MESSAGE); 	// tca_channel_select(uint8_t channel_addr, uint8_t en_mesg); channel_addr 0-7
-			write_Hall_reading_to_txt(1,96);
-		   	usleep(10000);
-			write_Hall_reading_to_txt(1,97);
-		   	usleep(10000);
-			write_Hall_reading_to_txt(1,99);
-		   	usleep(10000);
-			write_Hall_reading_to_txt(1,100);
-		   	usleep(10000);
-			write_Hall_reading_to_txt(1,108);
-	    	printf("Read channel 1 Complete! \n");
+		write_Hall_reading_to_txt(7,108);
 
-	    	printf("channel 0 Start! \n");
-			tca_channel_select(HUB_channel_0_on, ENABLE_MESSAGE); 	// tca_channel_select(uint8_t channel_addr, uint8_t en_mesg); channel_addr 0-7
-			write_Hall_reading_to_txt(0,96);
-		   	usleep(10000);
-			write_Hall_reading_to_txt(0,97);
-		   	usleep(10000);
-			write_Hall_reading_to_txt(0,99);
-		   	usleep(10000);
-			write_Hall_reading_to_txt(0,0);
-		   	usleep(10000);
-			write_Hall_reading_to_txt(0,101);
-		   	usleep(10000);
-			write_Hall_reading_to_txt(0,109);
-			printf("Read channel 0 Complete! \n");
-	    }
+		tca_channel_select(HUB_channel_all_off, DISABLE_MESSAGE); 	// tca_channel_select(uint8_t channel_addr, uint8_t en_mesg); channel_addr 0-7
+		usleep(10000);
+		tca_channel_select(HUB_channel_7_on, DISABLE_MESSAGE); 	// tca_channel_select(uint8_t channel_addr, uint8_t en_mesg); channel_addr 0-7
+
+		printf("Read channel 7 Complete! \n");
+
+		printf("channel 6 Start! \n");
+		tca_channel_select(HUB_channel_6_on, ENABLE_MESSAGE); 	// tca_channel_select(uint8_t channel_addr, uint8_t en_mesg); channel_addr 0-7
+		write_Hall_reading_to_txt(6,96);
+		usleep(10000);
+
+		tca_channel_select(HUB_channel_all_off, DISABLE_MESSAGE); 	// tca_channel_select(uint8_t channel_addr, uint8_t en_mesg); channel_addr 0-7
+		usleep(10000);
+		tca_channel_select(HUB_channel_6_on, DISABLE_MESSAGE); 	// tca_channel_select(uint8_t channel_addr, uint8_t en_mesg); channel_addr 0-7
+
+		write_Hall_reading_to_txt(6,97);
+		usleep(10000);
 
 
+		tca_channel_select(HUB_channel_all_off, DISABLE_MESSAGE); 	// tca_channel_select(uint8_t channel_addr, uint8_t en_mesg); channel_addr 0-7
+		usleep(10000);
+		tca_channel_select(HUB_channel_6_on, DISABLE_MESSAGE); 	// tca_channel_select(uint8_t channel_addr, uint8_t en_mesg); channel_addr 0-7
 
+		write_Hall_reading_to_txt(6,99);
+		usleep(10000);
+
+		tca_channel_select(HUB_channel_all_off, DISABLE_MESSAGE); 	// tca_channel_select(uint8_t channel_addr, uint8_t en_mesg); channel_addr 0-7
+		usleep(10000);
+		tca_channel_select(HUB_channel_6_on, DISABLE_MESSAGE); 	// tca_channel_select(uint8_t channel_addr, uint8_t en_mesg); channel_addr 0-7
+
+		write_Hall_reading_to_txt(6,100);
+		usleep(10000);
+
+		tca_channel_select(HUB_channel_all_off, DISABLE_MESSAGE); 	// tca_channel_select(uint8_t channel_addr, uint8_t en_mesg); channel_addr 0-7
+		usleep(10000);
+		tca_channel_select(HUB_channel_6_on, DISABLE_MESSAGE); 	// tca_channel_select(uint8_t channel_addr, uint8_t en_mesg); channel_addr 0-7
+
+		write_Hall_reading_to_txt(6,108);
+
+
+		tca_channel_select(HUB_channel_all_off, DISABLE_MESSAGE); 	// tca_channel_select(uint8_t channel_addr, uint8_t en_mesg); channel_addr 0-7
+		usleep(10000);
+		tca_channel_select(HUB_channel_6_on, DISABLE_MESSAGE); 	// tca_channel_select(uint8_t channel_addr, uint8_t en_mesg); channel_addr 0-7
+
+		printf("Read channel 6 Complete! \n");
+
+		printf("channel 5 Start! \n");
+		tca_channel_select(HUB_channel_5_on, ENABLE_MESSAGE); 	// tca_channel_select(uint8_t channel_addr, uint8_t en_mesg); channel_addr 0-7
+		write_Hall_reading_to_txt(5,96);
+		usleep(10000);
+
+		tca_channel_select(HUB_channel_all_off, DISABLE_MESSAGE); 	// tca_channel_select(uint8_t channel_addr, uint8_t en_mesg); channel_addr 0-7
+		usleep(10000);
+		tca_channel_select(HUB_channel_5_on, DISABLE_MESSAGE); 	// tca_channel_select(uint8_t channel_addr, uint8_t en_mesg); channel_addr 0-7
+
+		write_Hall_reading_to_txt(5,97);
+		usleep(10000);
+
+		tca_channel_select(HUB_channel_all_off, DISABLE_MESSAGE); 	// tca_channel_select(uint8_t channel_addr, uint8_t en_mesg); channel_addr 0-7
+		usleep(10000);
+		tca_channel_select(HUB_channel_5_on, DISABLE_MESSAGE); 	// tca_channel_select(uint8_t channel_addr, uint8_t en_mesg); channel_addr 0-7
+
+		write_Hall_reading_to_txt(5,99);
+		usleep(10000);
+
+		tca_channel_select(HUB_channel_all_off, DISABLE_MESSAGE); 	// tca_channel_select(uint8_t channel_addr, uint8_t en_mesg); channel_addr 0-7
+		usleep(10000);
+		tca_channel_select(HUB_channel_5_on, DISABLE_MESSAGE); 	// tca_channel_select(uint8_t channel_addr, uint8_t en_mesg); channel_addr 0-7
+
+		write_Hall_reading_to_txt(5,100);
+		usleep(10000);
+
+		tca_channel_select(HUB_channel_all_off, DISABLE_MESSAGE); 	// tca_channel_select(uint8_t channel_addr, uint8_t en_mesg); channel_addr 0-7
+		usleep(10000);
+		tca_channel_select(HUB_channel_5_on, DISABLE_MESSAGE); 	// tca_channel_select(uint8_t channel_addr, uint8_t en_mesg); channel_addr 0-7
+
+		write_Hall_reading_to_txt(5,108);
+
+		tca_channel_select(HUB_channel_all_off, DISABLE_MESSAGE); 	// tca_channel_select(uint8_t channel_addr, uint8_t en_mesg); channel_addr 0-7
+		usleep(10000);
+		tca_channel_select(HUB_channel_5_on, DISABLE_MESSAGE); 	// tca_channel_select(uint8_t channel_addr, uint8_t en_mesg); channel_addr 0-7
+
+		printf("Read channel 5 Complete! \n");
+
+		printf("channel 4 Start! \n");
+		tca_channel_select(HUB_channel_4_on, ENABLE_MESSAGE); 	// tca_channel_select(uint8_t channel_addr, uint8_t en_mesg); channel_addr 0-7
+		write_Hall_reading_to_txt(4,96);
+		usleep(10000);
+
+		tca_channel_select(HUB_channel_all_off, DISABLE_MESSAGE); 	// tca_channel_select(uint8_t channel_addr, uint8_t en_mesg); channel_addr 0-7
+		usleep(10000);
+		tca_channel_select(HUB_channel_4_on, DISABLE_MESSAGE); 	// tca_channel_select(uint8_t channel_addr, uint8_t en_mesg); channel_addr 0-7
+
+		write_Hall_reading_to_txt(4,97);
+		usleep(10000);
+		tca_channel_select(HUB_channel_all_off, DISABLE_MESSAGE); 	// tca_channel_select(uint8_t channel_addr, uint8_t en_mesg); channel_addr 0-7
+		usleep(10000);
+		tca_channel_select(HUB_channel_4_on, DISABLE_MESSAGE); 	// tca_channel_select(uint8_t channel_addr, uint8_t en_mesg); channel_addr 0-7
+
+		write_Hall_reading_to_txt(4,99);
+		usleep(10000);
+		tca_channel_select(HUB_channel_all_off, DISABLE_MESSAGE); 	// tca_channel_select(uint8_t channel_addr, uint8_t en_mesg); channel_addr 0-7
+		usleep(10000);
+		tca_channel_select(HUB_channel_4_on, DISABLE_MESSAGE); 	// tca_channel_select(uint8_t channel_addr, uint8_t en_mesg); channel_addr 0-7
+
+		write_Hall_reading_to_txt(4,100);
+		usleep(10000);
+		tca_channel_select(HUB_channel_all_off, DISABLE_MESSAGE); 	// tca_channel_select(uint8_t channel_addr, uint8_t en_mesg); channel_addr 0-7
+		usleep(10000);
+		tca_channel_select(HUB_channel_4_on, DISABLE_MESSAGE); 	// tca_channel_select(uint8_t channel_addr, uint8_t en_mesg); channel_addr 0-7
+
+		write_Hall_reading_to_txt(4,108);
+		tca_channel_select(HUB_channel_all_off, DISABLE_MESSAGE); 	// tca_channel_select(uint8_t channel_addr, uint8_t en_mesg); channel_addr 0-7
+		usleep(10000);
+		tca_channel_select(HUB_channel_4_on, DISABLE_MESSAGE); 	// tca_channel_select(uint8_t channel_addr, uint8_t en_mesg); channel_addr 0-7
+
+		printf("Read channel 4 Complete! \n");
+
+		printf("channel 3 Start! \n");
+		tca_channel_select(HUB_channel_3_on, ENABLE_MESSAGE); 	// tca_channel_select(uint8_t channel_addr, uint8_t en_mesg); channel_addr 0-7
+		write_Hall_reading_to_txt(3,96);
+		usleep(10000);
+		tca_channel_select(HUB_channel_all_off, DISABLE_MESSAGE); 	// tca_channel_select(uint8_t channel_addr, uint8_t en_mesg); channel_addr 0-7
+		usleep(10000);
+		tca_channel_select(HUB_channel_3_on, DISABLE_MESSAGE); 	// tca_channel_select(uint8_t channel_addr, uint8_t en_mesg); channel_addr 0-7
+
+		write_Hall_reading_to_txt(3,97);
+		usleep(10000);
+		tca_channel_select(HUB_channel_all_off, DISABLE_MESSAGE); 	// tca_channel_select(uint8_t channel_addr, uint8_t en_mesg); channel_addr 0-7
+		usleep(10000);
+		tca_channel_select(HUB_channel_3_on, DISABLE_MESSAGE); 	// tca_channel_select(uint8_t channel_addr, uint8_t en_mesg); channel_addr 0-7
+
+		write_Hall_reading_to_txt(3,99);
+		usleep(10000);
+		tca_channel_select(HUB_channel_all_off, DISABLE_MESSAGE); 	// tca_channel_select(uint8_t channel_addr, uint8_t en_mesg); channel_addr 0-7
+		usleep(10000);
+		tca_channel_select(HUB_channel_3_on, DISABLE_MESSAGE); 	// tca_channel_select(uint8_t channel_addr, uint8_t en_mesg); channel_addr 0-7
+
+		write_Hall_reading_to_txt(3,0);
+		usleep(10000);
+		tca_channel_select(HUB_channel_all_off, DISABLE_MESSAGE); 	// tca_channel_select(uint8_t channel_addr, uint8_t en_mesg); channel_addr 0-7
+		usleep(10000);
+		tca_channel_select(HUB_channel_3_on, DISABLE_MESSAGE); 	// tca_channel_select(uint8_t channel_addr, uint8_t en_mesg); channel_addr 0-7
+
+		write_Hall_reading_to_txt(3,107);
+		tca_channel_select(HUB_channel_all_off, DISABLE_MESSAGE); 	// tca_channel_select(uint8_t channel_addr, uint8_t en_mesg); channel_addr 0-7
+		usleep(10000);
+		tca_channel_select(HUB_channel_3_on, DISABLE_MESSAGE); 	// tca_channel_select(uint8_t channel_addr, uint8_t en_mesg); channel_addr 0-7
+
+		printf("Read channel 3 Complete! \n");
+
+		printf("channel 2 Start! \n");
+		tca_channel_select(HUB_channel_2_on, ENABLE_MESSAGE); 	// tca_channel_select(uint8_t channel_addr, uint8_t en_mesg); channel_addr 0-7
+		write_Hall_reading_to_txt(2,96);
+		usleep(10000);
+		tca_channel_select(HUB_channel_all_off, DISABLE_MESSAGE); 	// tca_channel_select(uint8_t channel_addr, uint8_t en_mesg); channel_addr 0-7
+		usleep(10000);
+		tca_channel_select(HUB_channel_2_on, DISABLE_MESSAGE); 	// tca_channel_select(uint8_t channel_addr, uint8_t en_mesg); channel_addr 0-7
+
+		write_Hall_reading_to_txt(2,97);
+		usleep(10000);
+		tca_channel_select(HUB_channel_all_off, DISABLE_MESSAGE); 	// tca_channel_select(uint8_t channel_addr, uint8_t en_mesg); channel_addr 0-7
+		usleep(10000);
+		tca_channel_select(HUB_channel_2_on, DISABLE_MESSAGE); 	// tca_channel_select(uint8_t channel_addr, uint8_t en_mesg); channel_addr 0-7
+
+		write_Hall_reading_to_txt(2,99);
+		usleep(10000);
+		tca_channel_select(HUB_channel_all_off, DISABLE_MESSAGE); 	// tca_channel_select(uint8_t channel_addr, uint8_t en_mesg); channel_addr 0-7
+		usleep(10000);
+		tca_channel_select(HUB_channel_2_on, DISABLE_MESSAGE); 	// tca_channel_select(uint8_t channel_addr, uint8_t en_mesg); channel_addr 0-7
+
+		write_Hall_reading_to_txt(2,100);
+		usleep(10000);
+		tca_channel_select(HUB_channel_all_off, DISABLE_MESSAGE); 	// tca_channel_select(uint8_t channel_addr, uint8_t en_mesg); channel_addr 0-7
+		usleep(10000);
+		tca_channel_select(HUB_channel_2_on, DISABLE_MESSAGE); 	// tca_channel_select(uint8_t channel_addr, uint8_t en_mesg); channel_addr 0-7
+
+		write_Hall_reading_to_txt(2,108);
+		tca_channel_select(HUB_channel_all_off, DISABLE_MESSAGE); 	// tca_channel_select(uint8_t channel_addr, uint8_t en_mesg); channel_addr 0-7
+		usleep(10000);
+		tca_channel_select(HUB_channel_2_on, DISABLE_MESSAGE); 	// tca_channel_select(uint8_t channel_addr, uint8_t en_mesg); channel_addr 0-7
+
+		printf("Read channel 2 Complete! \n");
+
+		printf("channel 1 Start! \n");
+		tca_channel_select(HUB_channel_1_on, ENABLE_MESSAGE); 	// tca_channel_select(uint8_t channel_addr, uint8_t en_mesg); channel_addr 0-7
+		write_Hall_reading_to_txt(1,96);
+		usleep(10000);
+		tca_channel_select(HUB_channel_all_off, DISABLE_MESSAGE); 	// tca_channel_select(uint8_t channel_addr, uint8_t en_mesg); channel_addr 0-7
+		usleep(10000);
+		tca_channel_select(HUB_channel_1_on, DISABLE_MESSAGE); 	// tca_channel_select(uint8_t channel_addr, uint8_t en_mesg); channel_addr 0-7
+
+		write_Hall_reading_to_txt(1,97);
+		usleep(10000);
+		tca_channel_select(HUB_channel_all_off, DISABLE_MESSAGE); 	// tca_channel_select(uint8_t channel_addr, uint8_t en_mesg); channel_addr 0-7
+		usleep(10000);
+		tca_channel_select(HUB_channel_1_on, DISABLE_MESSAGE); 	// tca_channel_select(uint8_t channel_addr, uint8_t en_mesg); channel_addr 0-7
+
+		write_Hall_reading_to_txt(1,99);
+		usleep(10000);
+		tca_channel_select(HUB_channel_all_off, DISABLE_MESSAGE); 	// tca_channel_select(uint8_t channel_addr, uint8_t en_mesg); channel_addr 0-7
+		usleep(10000);
+		tca_channel_select(HUB_channel_1_on, DISABLE_MESSAGE); 	// tca_channel_select(uint8_t channel_addr, uint8_t en_mesg); channel_addr 0-7
+
+		write_Hall_reading_to_txt(1,100);
+		usleep(10000);
+		tca_channel_select(HUB_channel_all_off, DISABLE_MESSAGE); 	// tca_channel_select(uint8_t channel_addr, uint8_t en_mesg); channel_addr 0-7
+		usleep(10000);
+		tca_channel_select(HUB_channel_1_on, DISABLE_MESSAGE); 	// tca_channel_select(uint8_t channel_addr, uint8_t en_mesg); channel_addr 0-7
+
+		write_Hall_reading_to_txt(1,108);
+		tca_channel_select(HUB_channel_all_off, DISABLE_MESSAGE); 	// tca_channel_select(uint8_t channel_addr, uint8_t en_mesg); channel_addr 0-7
+		usleep(10000);
+		tca_channel_select(HUB_channel_1_on, DISABLE_MESSAGE); 	// tca_channel_select(uint8_t channel_addr, uint8_t en_mesg); channel_addr 0-7
+
+		printf("Read channel 1 Complete! \n");
+
+		printf("channel 0 Start! \n");
+		tca_channel_select(HUB_channel_0_on, ENABLE_MESSAGE); 	// tca_channel_select(uint8_t channel_addr, uint8_t en_mesg); channel_addr 0-7
+		write_Hall_reading_to_txt(0,96);
+		usleep(10000);
+		tca_channel_select(HUB_channel_all_off, DISABLE_MESSAGE); 	// tca_channel_select(uint8_t channel_addr, uint8_t en_mesg); channel_addr 0-7
+		usleep(10000);
+		tca_channel_select(HUB_channel_0_on, DISABLE_MESSAGE); 	// tca_channel_select(uint8_t channel_addr, uint8_t en_mesg); channel_addr 0-7
+
+		write_Hall_reading_to_txt(0,97);
+		usleep(10000);
+		tca_channel_select(HUB_channel_all_off, DISABLE_MESSAGE); 	// tca_channel_select(uint8_t channel_addr, uint8_t en_mesg); channel_addr 0-7
+		usleep(10000);
+		tca_channel_select(HUB_channel_0_on, DISABLE_MESSAGE); 	// tca_channel_select(uint8_t channel_addr, uint8_t en_mesg); channel_addr 0-7
+
+		write_Hall_reading_to_txt(0,99);
+		usleep(10000);
+		tca_channel_select(HUB_channel_all_off, DISABLE_MESSAGE); 	// tca_channel_select(uint8_t channel_addr, uint8_t en_mesg); channel_addr 0-7
+		usleep(10000);
+		tca_channel_select(HUB_channel_0_on, DISABLE_MESSAGE); 	// tca_channel_select(uint8_t channel_addr, uint8_t en_mesg); channel_addr 0-7
+
+		write_Hall_reading_to_txt(0,0);
+		usleep(10000);
+		tca_channel_select(HUB_channel_all_off, DISABLE_MESSAGE); 	// tca_channel_select(uint8_t channel_addr, uint8_t en_mesg); channel_addr 0-7
+		usleep(10000);
+		tca_channel_select(HUB_channel_0_on, DISABLE_MESSAGE); 	// tca_channel_select(uint8_t channel_addr, uint8_t en_mesg); channel_addr 0-7
+
+		write_Hall_reading_to_txt(0,101);
+		usleep(10000);
+		tca_channel_select(HUB_channel_all_off, DISABLE_MESSAGE); 	// tca_channel_select(uint8_t channel_addr, uint8_t en_mesg); channel_addr 0-7
+		usleep(10000);
+		tca_channel_select(HUB_channel_0_on, DISABLE_MESSAGE); 	// tca_channel_select(uint8_t channel_addr, uint8_t en_mesg); channel_addr 0-7
+
+		write_Hall_reading_to_txt(0,109);
+		tca_channel_select(HUB_channel_all_off, DISABLE_MESSAGE); 	// tca_channel_select(uint8_t channel_addr, uint8_t en_mesg); channel_addr 0-7
+		usleep(10000);
+		tca_channel_select(HUB_channel_0_on, DISABLE_MESSAGE); 	// tca_channel_select(uint8_t channel_addr, uint8_t en_mesg); channel_addr 0-7
+
+		printf("Read channel 0 Complete! \n");
+	}
+*/
+
+
+/*
     // pulse length < pulse_spacing. pulse_spacing should be as wide as pulse length, i.e. 50% duty cycle
     for(i = 1; i< igbt_pulse_num-1; i++){
     	if ( pulse_length[i]/50 >= pulse_spacing_us  ){
@@ -925,7 +1122,7 @@ int main(int argc, char * argv[]) {
 
     IGBT_Single_Pulse(pulse_spacing_us, number_of_iteration, pulse_length);
     printf("Pulse Complete! \n");
-
+*/
     // clean up our memory mapping and exit
 	//close_system();
 
